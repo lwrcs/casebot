@@ -460,13 +460,13 @@ async def _handle_register(message):
     conn = db.get_connection()
     try:
         existing = db.get_user(conn, discord_id)
-        if existing and existing.name != "there":
+        if existing and existing.calendars:
             await discord_service.send_dm(
                 "You're already registered! Use /unregister to remove your account.",
                 discord_id, message.channel,
             )
             return
-        # Create or reactivate user record
+        # Create or reactivate user record (needed so OAuth callback can UPDATE the row)
         db.create_user(conn, discord_id, str(message.author))
     finally:
         conn.close()

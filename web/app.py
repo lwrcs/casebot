@@ -10,6 +10,7 @@ if os.getenv("WEB_HOST", "").startswith("http://"):
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 from fastapi.responses import HTMLResponse
 
+from config import settings
 from db import database as db
 from web.oauth import build_auth_url, exchange_code, make_state_token, verify_state_token
 
