@@ -18,11 +18,13 @@ logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=None, redoc_url=None)
 
 _discord_client = None
+_main_loop = None
 
 
-def set_discord_client(client):
-    global _discord_client
+def set_discord_client(client, loop):
+    global _discord_client, _main_loop
     _discord_client = client
+    _main_loop = loop
 
 
 @app.get("/health")
@@ -89,9 +91,11 @@ async def auth_google_callback(request: Request, code: str | None = None,
     except Exception:
         logger.exception(f"Calendar list sync failed for {discord_id}")
 
-    # DM the user to complete onboarding
-    if _discord_client:
-        asyncio.create_task(_send_onboarding_dm(discord_id))
+    # DM the user to complete onboarding.
+    # The web server runs in a separate thread with its own event loop, so we
+    # must schedule the coroutine on the Discord bot's (main thread) loop.
+    if _discord_client and _main_loop:
+        asyncio.run_coroutine_threadsafe(_send_onboarding_dm(discord_id), _main_loop)
 
     return HTMLResponse(
         "<html><body>"

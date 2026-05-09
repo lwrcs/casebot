@@ -36,7 +36,7 @@ def _is_dev(discord_id: str) -> bool:
 @discord_service.client.event
 async def on_ready():
     _log("🤖", f"CaseBot ready ({discord_service.client.user})")
-    set_discord_client(discord_service.client)
+    set_discord_client(discord_service.client, asyncio.get_event_loop())
     scheduler_service.start_scheduler()
     await scheduler_service.recover_unsent_reminders()
     # Re-schedule morning briefings for all active users
