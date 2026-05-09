@@ -608,6 +608,36 @@ def get_facts_by_tags(conn, discord_id: str, tag_names: list[str]) -> list[dict]
     return facts
 
 
+def get_all_facts(conn, discord_id: str) -> list[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, content, created_at FROM facts WHERE user_id=%s ORDER BY created_at ASC",
+            (discord_id,),
+        )
+        rows = cur.fetchall()
+    facts = []
+    for row in rows:
+        try:
+            content = decrypt(discord_id, bytes(row["content"]))
+        except Exception:
+            content = str(row["content"])
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT t.name FROM tags t
+                   JOIN fact_tags ft ON t.id = ft.tag_id
+                   WHERE ft.fact_id=%s AND t.user_id=%s""",
+                (row["id"], discord_id),
+            )
+            tag_rows = cur.fetchall()
+        facts.append({
+            "id": row["id"],
+            "content": content,
+            "tags": [t["name"] for t in tag_rows],
+            "created_at": str(row["created_at"])[:10],
+        })
+    return facts
+
+
 # ── Calendar sync token ───────────────────────────────────────────────────────
 
 def get_sync_token(conn, discord_id: str) -> str | None:

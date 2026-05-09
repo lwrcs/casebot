@@ -149,6 +149,9 @@ async def on_message(message):
     if text.lower() in ("/whitelist", "whitelist"):
         await _handle_whitelist_command(discord_id, message.channel)
         return
+    if text.lower() in ("/backup", "backup"):
+        await _handle_backup(message, discord_id, user_ctx)
+        return
     if text.lower() in ("/registertest", "registertest") and _is_dev(discord_id):
         await _handle_registertest(discord_id, message.channel)
         return
@@ -432,6 +435,7 @@ Commands:
   /register    Connect your Google Calendar and create your account
   /unregister  Delete your account and all stored data (GDPR)
   /whitelist   Choose which calendars CaseBot can read and write
+  /backup      Download your stored facts as a text file
   /help        Show this message
 
 What I can do (just talk to me naturally):
@@ -549,6 +553,28 @@ async def _show_calendar_whitelist_menu(discord_id: str, channel):
         "selected": set(),
         "channel_id": channel.id,
     }
+
+
+async def _handle_backup(message, discord_id: str, user_ctx):
+    import io
+    from datetime import date as _date
+    await discord_service.send_dm("Preparing your backup...", discord_id, message.channel)
+    conn = db.get_connection()
+    try:
+        facts = db.get_all_facts(conn, discord_id)
+    finally:
+        conn.close()
+    if not facts:
+        await discord_service.send_dm("No facts stored yet — nothing to back up.", discord_id, message.channel)
+        return
+    async with message.channel.typing():
+        text = await claude_service.generate_facts_backup(user_ctx, facts)
+    filename = f"casebot_backup_{_date.today().isoformat()}.txt"
+    await message.channel.send(
+        f"Backup ready — {len(facts)} fact(s) on record.",
+        file=discord.File(io.BytesIO(text.encode("utf-8")), filename=filename),
+    )
+    _log("💾", f"[{discord_id}] /backup sent ({len(facts)} facts)")
 
 
 async def _handle_registertest(discord_id: str, channel):

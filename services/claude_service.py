@@ -252,3 +252,31 @@ def _extract_text(response) -> str:
         if hasattr(block, "text"):
             return block.text
     return ""
+
+
+async def generate_facts_backup(user_ctx: UserContext, facts: list[dict]) -> str:
+    raw_lines = "\n".join(
+        f"[{f['created_at']}] {f['content']}"
+        + (f"  (tags: {', '.join(f['tags'])})" if f["tags"] else "")
+        for f in facts
+    )
+    client = _get_client()
+    response = await _call_api(
+        client,
+        model=MODEL_SONNET,
+        max_tokens=4096,
+        system=f"You are preparing a personal knowledge backup document for {user_ctx.name}.",
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Below are raw fact entries recorded about {user_ctx.name} by a personal assistant bot. "
+                "Organize and transcribe them into a clean, readable plain-text document. "
+                "Group related facts under clear headings (e.g. Personal, Work, Goals, Preferences, Health). "
+                "Preserve every piece of information — do not omit or collapse details. "
+                "Include the date each fact was recorded next to it. "
+                "Use plain text only, no markdown.\n\n"
+                f"RAW FACTS ({len(facts)} entries):\n{raw_lines}"
+            ),
+        }],
+    )
+    return _extract_text(response)
