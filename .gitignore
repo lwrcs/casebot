@@ -1,0 +1,32 @@
+# Secrets & local config
+.env
+credentials.json
+token.json
+
+# Databases
+casebot.db
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# IDE / tools
+.idea/
+.vscode/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
