@@ -106,13 +106,14 @@ def get_user(conn, discord_id: str) -> UserContext | None:
 
 
 def create_user(conn, discord_id: str, discord_username: str | None = None) -> UserContext:
+    behavior_enc = encrypt(discord_id, json.dumps(dict(DEFAULT_BEHAVIOR)))
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO users (discord_id, discord_username)
-               VALUES (%s, %s)
+            """INSERT INTO users (discord_id, discord_username, behavior)
+               VALUES (%s, %s, %s)
                ON CONFLICT (discord_id) DO UPDATE SET active = true, discord_username = EXCLUDED.discord_username
                RETURNING *""",
-            (discord_id, discord_username),
+            (discord_id, discord_username, behavior_enc),
         )
         row = cur.fetchone()
     conn.commit()
