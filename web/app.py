@@ -104,10 +104,6 @@ async def auth_google_callback(request: Request, code: str | None = None,
 async def _send_onboarding_dm(discord_id: str):
     try:
         user = await _discord_client.fetch_user(int(discord_id))
-        await user.send(
-            "Google Calendar connected! A couple quick setup questions:\n\n"
-            "1. What's your name?\n"
-            "2. What's your timezone? (e.g. America/New_York, America/Chicago, America/Los_Angeles, Europe/London)"
-        )
+        await user.send("Google Calendar connected!\n\nWhat should I call you?")
     except Exception:
         logger.exception(f"Failed to send onboarding DM to {discord_id}")
