@@ -4,6 +4,9 @@ primary_region = "iad"
 
 [build]
 
+[deploy]
+  release_command = "python -c 'from db import database; database.init_db()'"
+
 [http_service]
   internal_port = 8080
   force_https = true
