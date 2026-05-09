@@ -78,14 +78,22 @@ async def auth_google_callback(request: Request, code: str | None = None,
     finally:
         conn.close()
 
-    # Sync calendar list now that we have a valid token
+    # Sync calendar list now that we have a valid token, and auto-detect timezone
     try:
         from services import calendar_service
+        from zoneinfo import ZoneInfo
         conn2 = db.get_connection()
         try:
             user_ctx = db.get_user(conn2, discord_id)
             if user_ctx:
-                calendar_service.sync_user_calendars(conn2, user_ctx)
+                _, detected_tz = calendar_service.sync_user_calendars(conn2, user_ctx)
+                if detected_tz:
+                    try:
+                        ZoneInfo(detected_tz)  # validate it's a real tz identifier
+                        db.update_user_profile(conn2, discord_id, timezone=detected_tz)
+                        logger.info(f"Auto-set timezone {detected_tz} for {discord_id}")
+                    except Exception:
+                        logger.warning(f"Ignoring unrecognised timezone {detected_tz!r} for {discord_id}")
         finally:
             conn2.close()
     except Exception:
@@ -108,6 +116,16 @@ async def auth_google_callback(request: Request, code: str | None = None,
 async def _send_onboarding_dm(discord_id: str):
     try:
         user = await _discord_client.fetch_user(int(discord_id))
-        await user.send("Google Calendar connected!\n\nWhat should I call you?")
+        conn = db.get_connection()
+        try:
+            user_ctx = db.get_user(conn, discord_id)
+            tz = user_ctx.timezone if user_ctx else "UTC"
+        finally:
+            conn.close()
+        if tz != "UTC":
+            msg = f"Google Calendar connected! I've detected your timezone as {tz}.\n\nWhat should I call you?"
+        else:
+            msg = "Google Calendar connected!\n\nWhat should I call you?"
+        await user.send(msg)
     except Exception:
         logger.exception(f"Failed to send onboarding DM to {discord_id}")

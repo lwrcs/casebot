@@ -47,7 +47,7 @@ async def on_ready():
             scheduler_service.schedule_morning_briefing(u.discord_id, u.timezone)
             try:
                 from services import calendar_service as cal_svc
-                cal_svc.sync_user_calendars(conn, u)
+                cal_svc.sync_user_calendars(conn, u)  # return value unused; users already onboarded
             except Exception:
                 logger.exception(f"Calendar list sync failed on startup for {u.discord_id}")
         if users:
@@ -583,7 +583,7 @@ async def _handle_registertest(discord_id: str, channel):
         user_ctx = db.get_user(conn, discord_id)
         if user_ctx:
             try:
-                calendar_service.sync_user_calendars(conn, user_ctx)
+                calendar_service.sync_user_calendars(conn, user_ctx)  # discard tz in dev test
             except Exception:
                 logger.exception("Calendar sync failed during registertest")
         db.set_calendar_whitelist(conn, discord_id, [])
@@ -660,19 +660,27 @@ async def _handle_onboarding(message, discord_id: str, user_ctx, text: str):
         conn = db.get_connection()
         try:
             db.update_user_profile(conn, discord_id, name=text.strip())
+            user_ctx = db.get_user(conn, discord_id)
         finally:
             conn.close()
-        _ONBOARDING_STATE[discord_id] = "timezone"
-        await discord_service.send_dm(
-            f"Got it, {text.strip()}! Now, what's your timezone?\n"
-            "Examples: America/New_York, America/Chicago, America/Los_Angeles, Europe/London\n"
-            "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
-            discord_id, message.channel,
-        )
+        tz = user_ctx.timezone if user_ctx else "UTC"
+        if tz != "UTC":
+            # Timezone was auto-detected from Google Calendar — skip asking
+            _ONBOARDING_STATE.pop(discord_id, None)
+            scheduler_service.schedule_morning_briefing(discord_id, tz)
+            await _show_calendar_whitelist_menu(discord_id, message.channel)
+        else:
+            # Auto-detection failed — ask manually
+            _ONBOARDING_STATE[discord_id] = "timezone"
+            await discord_service.send_dm(
+                f"Got it, {text.strip()}! What's your timezone?\n"
+                "Examples: America/New_York, America/Chicago, America/Los_Angeles, Europe/London\n"
+                "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+                discord_id, message.channel,
+            )
     elif state == "timezone":
-        # Basic validation
         try:
-            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            from zoneinfo import ZoneInfo
             ZoneInfo(text.strip())
         except Exception:
             await discord_service.send_dm(
@@ -684,7 +692,6 @@ async def _handle_onboarding(message, discord_id: str, user_ctx, text: str):
         conn = db.get_connection()
         try:
             db.update_user_profile(conn, discord_id, timezone=text.strip())
-            user_ctx = db.get_user(conn, discord_id)
         finally:
             conn.close()
         _ONBOARDING_STATE.pop(discord_id, None)

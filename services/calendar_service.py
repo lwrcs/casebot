@@ -45,16 +45,21 @@ def invalidate_service_cache(discord_id: str):
     _service_cache.pop(discord_id, None)
 
 
-def sync_user_calendars(conn, user_ctx: UserContext):
-    """Fetch user's calendar list from Google and persist to DB."""
+def sync_user_calendars(conn, user_ctx: UserContext) -> tuple[list, str | None]:
+    """Fetch user's calendar list from Google and persist to DB.
+    Returns (calendars, detected_timezone) where detected_timezone comes from
+    the primary calendar's timeZone field, or None if unavailable."""
     svc = get_calendar_service(conn, user_ctx)
     result = svc.calendarList().list().execute()
     items = result.get("items", [])
     calendars = []
+    detected_timezone = None
     for item in items:
         if item.get("deleted"):
             continue
         is_primary = item.get("primary", False)
+        if is_primary and item.get("timeZone"):
+            detected_timezone = item["timeZone"]
         calendars.append({
             "gcal_id": item["id"],
             "name": item.get("summary", item["id"]),
@@ -62,8 +67,8 @@ def sync_user_calendars(conn, user_ctx: UserContext):
             "is_default": is_primary,
         })
     db.upsert_user_calendars(conn, user_ctx.discord_id, calendars)
-    logger.info(f"Synced {len(calendars)} calendars for {user_ctx.discord_id}")
-    return calendars
+    logger.info(f"Synced {len(calendars)} calendars for {user_ctx.discord_id} (tz={detected_timezone})")
+    return calendars, detected_timezone
 
 
 def _resolve_calendar_id(user_ctx: UserContext, calendar_id: str | None) -> str:
