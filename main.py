@@ -663,39 +663,9 @@ async def _handle_onboarding(message, discord_id: str, user_ctx, text: str):
             user_ctx = db.get_user(conn, discord_id)
         finally:
             conn.close()
-        tz = user_ctx.timezone if user_ctx else "UTC"
-        if tz != "UTC":
-            # Timezone was auto-detected from Google Calendar — skip asking
-            _ONBOARDING_STATE.pop(discord_id, None)
-            scheduler_service.schedule_morning_briefing(discord_id, tz)
-            await _show_calendar_whitelist_menu(discord_id, message.channel)
-        else:
-            # Auto-detection failed — ask manually
-            _ONBOARDING_STATE[discord_id] = "timezone"
-            await discord_service.send_dm(
-                f"Got it, {text.strip()}! What's your timezone?\n"
-                "Examples: America/New_York, America/Chicago, America/Los_Angeles, Europe/London\n"
-                "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
-                discord_id, message.channel,
-            )
-    elif state == "timezone":
-        try:
-            from zoneinfo import ZoneInfo
-            ZoneInfo(text.strip())
-        except Exception:
-            await discord_service.send_dm(
-                f"I didn't recognize \"{text.strip()}\" as a timezone. "
-                "Try something like America/New_York or Europe/London.",
-                discord_id, message.channel,
-            )
-            return
-        conn = db.get_connection()
-        try:
-            db.update_user_profile(conn, discord_id, timezone=text.strip())
-        finally:
-            conn.close()
         _ONBOARDING_STATE.pop(discord_id, None)
-        scheduler_service.schedule_morning_briefing(discord_id, text.strip())
+        tz = user_ctx.timezone if user_ctx else "UTC"
+        scheduler_service.schedule_morning_briefing(discord_id, tz)
         await _show_calendar_whitelist_menu(discord_id, message.channel)
 
 
