@@ -55,8 +55,15 @@ async def auth_google_callback(request: Request, code: str | None = None,
     if not discord_id:
         raise HTTPException(400, "Invalid or expired state token — please start registration again")
 
+    # Fly.io (and most reverse proxies) terminate TLS and forward HTTP internally,
+    # so request.url has http:// even though the client used https://.
+    # oauthlib enforces https on the authorization_response, so fix the scheme.
+    callback_url = str(request.url)
+    if callback_url.startswith("http://") and settings.WEB_HOST.startswith("https://"):
+        callback_url = "https://" + callback_url[len("http://"):]
+
     try:
-        token_json = exchange_code(state, str(request.url))
+        token_json = exchange_code(state, callback_url)
     except Exception as e:
         logger.exception("Token exchange failed")
         raise HTTPException(500, f"Failed to exchange authorization code: {e}")
