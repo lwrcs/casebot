@@ -24,6 +24,11 @@ def set_discord_client(client):
     _discord_client = client
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.get("/auth/google")
 async def auth_google(state: str):
     """Redirect user to Google OAuth consent screen."""
