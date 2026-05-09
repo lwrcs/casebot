@@ -10,7 +10,7 @@ Classification rules:
 
 Fact extraction rules (only for "factual" and "both"):
 - Extract discrete atomic facts stated about the user
-- Write each fact as a plain declarative sentence about Harrison
+- Write each fact as a plain declarative sentence in third person (e.g. "The user runs marathons")
 - Do not include scheduling details in facts
 - Only extract facts explicitly stated, not inferred
 

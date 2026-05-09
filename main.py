@@ -177,10 +177,12 @@ async def on_message(message):
             classification = analysis.get("classification", "neither")
             _log("🔍", f"[{discord_id}] Classify → {classification}")
 
+            newly_stored_ids: set[int] = set()
             if classification in ("factual", "both"):
                 all_tags = db.get_all_tags(conn, discord_id)
                 for fact_content in analysis.get("facts", []):
                     fact_id = db.insert_fact(conn, discord_id, fact_content, text)
+                    newly_stored_ids.add(fact_id)
                     assigned = await tagger.tag_fact(fact_content, all_tags)
                     if assigned:
                         tag_map = db.upsert_tags(conn, discord_id, assigned)
@@ -205,11 +207,13 @@ async def on_message(message):
             tier = "sonnet" if use_sonnet else "haiku"
             _log("📡", f"Route → {' + '.join(route_parts) if route_parts else 'none'} [{tier}]")
 
-            # 4. Memory query
+            # 4. Memory query — exclude facts just stored in this request so we don't
+            #    echo the user's own words back to Claude as if they were historical context
             if needs_mem and route.get("query_tags"):
                 qtags = route["query_tags"]
                 _log("🔎", f"Querying memory: {', '.join(qtags)}")
                 facts = db.get_facts_by_tags(conn, discord_id, qtags)
+                facts = [f for f in facts if f["id"] not in newly_stored_ids]
                 if facts:
                     lines = [f"- {f['content']} [tags: {', '.join(f['tags'])}]" for f in facts]
                     extra_context = "Relevant facts from memory:\n" + "\n".join(lines)
@@ -220,12 +224,13 @@ async def on_message(message):
             # 5. Claude turn
             reply = await claude_service.run_claude_turn(conn, text, user_ctx, extra_context=extra_context, use_sonnet=use_sonnet)
 
-            # Memory transparency footer
+            # Memory transparency footer — no leading newlines if Claude returned nothing
             if stored_facts:
                 short = "; ".join(f[:80] for f in stored_facts[:3])
                 if len(stored_facts) > 3:
                     short += f" (+{len(stored_facts) - 3} more)"
-                reply = f"{reply}\n\n_Remembered: {short}_"
+                footer = f"_Remembered: {short}_"
+                reply = f"{reply}\n\n{footer}" if reply.strip() else footer
 
             _log("✉️ ", f"Reply ({len(reply)} chars)")
             option_menu = pop_pending_option_menu(discord_id)
