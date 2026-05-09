@@ -26,7 +26,7 @@ class Settings:
 
     # Web server for OAuth callbacks
     WEB_HOST: str = field(default_factory=lambda: os.getenv("WEB_HOST", "http://localhost:8080"))
-    WEB_PORT: int = field(default_factory=lambda: int(os.getenv("WEB_PORT", "8080")))
+    WEB_PORT: int = field(default_factory=lambda: int(os.getenv("PORT", os.getenv("WEB_PORT", "8080"))))
 
     # Bot settings
     CONVERSATION_HISTORY_TURNS: int = field(default_factory=lambda: int(os.getenv("CONVERSATION_HISTORY_TURNS", "20")))
